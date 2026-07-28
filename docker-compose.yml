@@ -1,0 +1,7 @@
+networks:
+  traefik_public:
+    name: traefik_public
+    driver: bridge
+
+volumes:
+  traefik_certificates:

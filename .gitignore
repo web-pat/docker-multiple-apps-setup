@@ -1,0 +1,5 @@
+# Secrets & environment
+.env
+
+# Traefik runtime data
+traefik/
