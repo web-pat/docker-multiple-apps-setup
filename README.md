@@ -1,4 +1,4 @@
-# Caerus Docker Configs
+# Docker Server Configs
 
 Multi-app Docker Compose setup with Traefik reverse proxy, Moodle, n8n, and FreshRSS.
 
