@@ -6,9 +6,9 @@ Multi-app Docker Compose setup with Traefik reverse proxy, Moodle, n8n, and Fres
 
 ```
 [Internet] → Host:80/443 → Traefik
-                            ├── lms.facultyai.eu  → Moodle   → MariaDB
-                            ├── n8n.webpat.net     → n8n      → PostgreSQL
-                            └── feeds.patrickweber.info → FreshRSS (SQLite)
+                            ├── moodle.example.com  → Moodle   → MariaDB
+                            ├── n8n.example.com     → n8n      → PostgreSQL
+                            └── feeds.example.com   → FreshRSS (SQLite)
 ```
 
 Only Traefik binds host ports (80/443). Every app registers with Traefik via Docker
@@ -27,18 +27,15 @@ run.sh                                   ← Helper script (shortcut for compose
 .gitignore
 ```
 
-The original monolithic file `docker-compose_moodle-tested.yml` is kept unchanged
-for reference.
-
 ## Secrets
 
 All credentials live in `.env`, **not** in the compose files:
 
 ```env
 # Domains
-MOODLE_SITE_URL=lms.facultyai.eu
-N8N_DOMAIN=n8n.webpat.net
-FRESHRSS_DOMAIN=feeds.patrickweber.info
+MOODLE_SITE_URL=moodle.example.com
+N8N_DOMAIN=n8n.example.com
+FRESHRSS_DOMAIN=feeds.example.com
 
 # Moodle
 MOODLE_DB_ROOT_PASSWORD=...
@@ -154,5 +151,5 @@ No ports to manage — only Traefik exposes 80/443 to the host.
   may be slow (certificate generation).
 - Moodle's initial setup is done via the `erseco/alpine-moodle` image env vars
   (admin user, site name, etc.). No manual install wizard needed.
-- n8n creates its admin user on first access (`https://n8n.webpat.net`).
-- FreshRSS shows its setup page on first access (`https://feeds.patrickweber.info`).
+- n8n creates its admin user on first access (`https://n8n.example.com`).
+- FreshRSS shows its setup page on first access (`https://feeds.example.com`).
