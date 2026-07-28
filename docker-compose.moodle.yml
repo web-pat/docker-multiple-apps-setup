@@ -29,12 +29,11 @@ services:
       - MOODLE_PASSWORD=${MOODLE_ADMIN_PASSWORD}
       - MOODLE_EMAIL=${MOODLE_ADMIN_EMAIL}
       - MOODLE_SITENAME=${MOODLE_SITENAME}
-      - REVERSEPROXY=true
+      - REVERSEPROXY=false
       - SSLPROXY=true
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/moodledata
-      - ./moodle-fix-nginx.sh:/docker-entrypoint-init.d/04-fix-nginx.sh
     depends_on:
       - mariadb
     networks:
