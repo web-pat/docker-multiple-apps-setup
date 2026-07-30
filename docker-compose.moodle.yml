@@ -55,6 +55,8 @@ networks:
   moodle_internal:
     name: moodle_internal
     driver: bridge
+  traefik_public:
+    external: true
 
 volumes:
   mariadb_data:
