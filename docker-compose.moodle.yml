@@ -36,6 +36,8 @@ services:
       - upload_max_filesize=500M
       - memory_limit=1G
       - max_input_vars=10000
+      - fastcgi_read_timeout=600s
+      - fastcgi_send_timeout=600s
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/moodledata
