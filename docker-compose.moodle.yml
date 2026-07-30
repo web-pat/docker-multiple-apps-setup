@@ -31,6 +31,11 @@ services:
       - MOODLE_SITENAME=${MOODLE_SITENAME}
       - REVERSEPROXY=false
       - SSLPROXY=true
+      - client_max_body_size=500M
+      - post_max_size=500M
+      - upload_max_filesize=500M
+      - memory_limit=1G
+      - max_input_vars=10000
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/moodledata
