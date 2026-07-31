@@ -1,0 +1,167 @@
+version: '3.8'
+
+# Open edX / Tutor Integration with Traefik
+# This is a minimal configuration to run Open edX behind Traefik
+# Tutor normally manages its own compose file, but this simplified version
+# integrates with your existing Traefik setup
+
+services:
+  # Open edX LMS (Learning Management System)
+  lms:
+    image: overhangio/openedx:18.0.0
+    container_name: openedx_lms
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - mysql
+      - redis
+    environment:
+      # Database connections
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DB=${OPENEDX_DB_NAME}
+      - MYSQL_USER=${OPENEDX_DB_USER}
+      - MYSQL_PASSWORD=${OPENEDX_DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # Site configuration
+      - OPENEDX_SITE_NAME=${OPENEDX_SITE_NAME}
+      - OPENEDX_LMS_ROOT_URL=https://${OPENEDX_SITE_URL}
+      - OPENEDX_CMS_ROOT_URL=https://studio-${OPENEDX_SITE_URL}
+
+      # Admin user
+      - OPENEDX_ADMIN_USERNAME=${OPENEDX_ADMIN_USERNAME}
+      - OPENEDX_ADMIN_EMAIL=${OPENEDX_ADMIN_EMAIL}
+      - OPENEDX_ADMIN_PASSWORD=${OPENEDX_ADMIN_PASSWORD}
+
+      # Traefik - reverse proxy mode
+      - OPENEDX_REVERSE_PROXY=true
+
+    volumes:
+      - openedx_data:/openedx/data
+    networks:
+      - openedx_internal
+      - traefik_public
+    labels:
+      # Enable Traefik
+      - 'traefik.enable=true'
+
+      # LMS (student-facing) router
+      - 'traefik.http.routers.openedx-lms.rule=Host(`${OPENEDX_SITE_URL}`)'
+      - 'traefik.http.routers.openedx-lms.entrypoints=websecure'
+      - 'traefik.http.routers.openedx-lms.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.openedx-lms.loadbalancer.server.port=8000'
+      - 'traefik.http.services.openedx-lms.loadbalancer.passhostheader=true'
+
+  # Open edX CMS (Studio - course editing)
+  cms:
+    image: overhangio/openedx:18.0.0
+    container_name: openedx_cms
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+      - mysql
+      - redis
+    environment:
+      # Same database connections
+      - MONGODB_HOST=mongodb
+      - MONGODB_PORT=27017
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_DB=${OPENEDX_DB_NAME}
+      - MYSQL_USER=${OPENEDX_DB_USER}
+      - MYSQL_PASSWORD=${OPENEDX_DB_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+      # Site configuration
+      - OPENEDX_SITE_NAME=${OPENEDX_SITE_NAME}
+      - OPENEDX_LMS_ROOT_URL=https://${OPENEDX_SITE_URL}
+      - OPENEDX_CMS_ROOT_URL=https://studio-${OPENEDX_SITE_URL}
+      - OPENEDX_REVERSE_PROXY=true
+
+    volumes:
+      - openedx_data:/openedx/data
+    networks:
+      - openedx_internal
+      - traefik_public
+    labels:
+      # Enable Traefik
+      - 'traefik.enable=true'
+
+      # CMS (instructor/admin) router
+      - 'traefik.http.routers.openedx-cms.rule=Host(`studio-${OPENEDX_SITE_URL}`)'
+      - 'traefik.http.routers.openedx-cms.entrypoints=websecure'
+      - 'traefik.http.routers.openedx-cms.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.openedx-cms.loadbalancer.server.port=8010'
+      - 'traefik.http.services.openedx-cms.loadbalancer.passhostheader=true'
+
+  # MySQL database (holds user data, courses, etc.)
+  mysql:
+    image: mysql:8.0
+    container_name: openedx_mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${OPENEDX_MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${OPENEDX_DB_NAME}
+      - MYSQL_USER=${OPENEDX_DB_USER}
+      - MYSQL_PASSWORD=${OPENEDX_DB_PASSWORD}
+    volumes:
+      - openedx_mysql_data:/var/lib/mysql
+    networks:
+      - openedx_internal
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+      interval: 10s
+
+  # MongoDB (holds course content, metadata)
+  mongodb:
+    image: mongo:7.0
+    container_name: openedx_mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${OPENEDX_MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${OPENEDX_MONGO_PASSWORD}
+      - MONGO_INITDB_DATABASE=${OPENEDX_MONGO_DB}
+    volumes:
+      - openedx_mongodb_data:/data/db
+    networks:
+      - openedx_internal
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      timeout: 5s
+      retries: 10
+      interval: 10s
+
+  # Redis (cache and session storage)
+  redis:
+    image: redis:7.0
+    container_name: openedx_redis
+    restart: unless-stopped
+    volumes:
+      - openedx_redis_data:/data
+    networks:
+      - openedx_internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      retries: 10
+      interval: 10s
+
+networks:
+  openedx_internal:
+    name: openedx_internal
+    driver: bridge
+  traefik_public:
+    external: true
+
+volumes:
+  openedx_data:
+  openedx_mysql_data:
+  openedx_mongodb_data:
+  openedx_redis_data:

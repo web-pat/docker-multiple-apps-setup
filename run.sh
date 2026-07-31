@@ -1,37 +1,81 @@
 #!/bin/bash
+
+# Docker Compose Helper Script for Multi-App Setup with Traefik
+# Manages Traefik, Open edX, n8n, and FreshRSS
+
 set -e
 
-BASE="-f docker-compose.yml -f docker-compose.traefik.yml"
-FILES_ALL="$BASE -f docker-compose.moodle.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
-FILES_MOODLE="$BASE -f docker-compose.moodle.yml"
-FILES_N8N="$BASE -f docker-compose.n8n.yml"
-FILES_FRESHRSS="$BASE -f docker-compose.freshrss.yml"
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-usage() {
-  echo "Usage: $0 {all|traefik|moodle|n8n|freshrss} [docker-compose arguments]"
-  echo ""
-  echo "Examples:"
-  echo "  $0 all up -d              Start all services"
-  echo "  $0 moodle up -d           Start moodle + traefik"
-  echo "  $0 n8n logs -f            Follow n8n logs"
-  echo "  $0 freshrss stop          Stop freshrss container"
-  echo ""
-  echo "Manage individual containers directly:"
-  echo "  docker compose stop moodle_app"
-  echo "  docker compose start moodle_app"
-  echo "  docker compose restart n8n_app"
-  exit 1
-}
+# Get service and command
+SERVICE=${1:-all}
+COMMAND=${2:-up -d}
 
-[ $# -lt 1 ] && usage
+# Shift arguments
+shift 2
 
-APP=$1; shift
-
-case "$APP" in
-  all)      docker compose $FILES_ALL "$@" ;;
-  moodle)   docker compose $FILES_MOODLE "$@" ;;
-  n8n)      docker compose $FILES_N8N "$@" ;;
-  freshrss) docker compose $FILES_FRESHRSS "$@" ;;
-  traefik)  docker compose $BASE "$@" ;;
-  *)        usage ;;
+# Map services to their compose files
+case "$SERVICE" in
+  all)
+    echo -e "${GREEN}Managing all services (traefik, openedx, n8n, freshrss)${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.openedx.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
+    ;;
+  traefik)
+    echo -e "${GREEN}Managing Traefik only${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml"
+    ;;
+  openedx)
+    echo -e "${GREEN}Managing Open edX (LMS + CMS + databases)${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.openedx.yml"
+    ;;
+  n8n)
+    echo -e "${GREEN}Managing n8n${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.n8n.yml"
+    ;;
+  freshrss)
+    echo -e "${GREEN}Managing FreshRSS${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.freshrss.yml"
+    ;;
+  *)
+    echo -e "${RED}Unknown service: $SERVICE${NC}"
+    echo "Available services: all, traefik, openedx, n8n, freshrss"
+    exit 1
+    ;;
 esac
+
+# Validate .env file exists
+if [ ! -f .env ]; then
+  echo -e "${RED}Error: .env file not found!${NC}"
+  echo "Create one based on your services' .env.example files"
+  exit 1
+fi
+
+# Execute docker-compose command
+echo -e "${YELLOW}Running: docker-compose $COMPOSE_FILES $COMMAND $@${NC}"
+docker-compose $COMPOSE_FILES $COMMAND $@
+
+# Provide helpful output for specific commands
+if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
+  echo ""
+  echo -e "${GREEN}✓ Services starting...${NC}"
+  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "openedx" ]]; then
+    echo "  Open edX LMS:  https://lms.example.com (replace with your domain)"
+    echo "  Open edX CMS:  https://studio-lms.example.com"
+  fi
+  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "n8n" ]]; then
+    echo "  n8n:           https://n8n.example.com"
+  fi
+  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "freshrss" ]]; then
+    echo "  FreshRSS:      https://feeds.example.com"
+  fi
+  echo ""
+  echo "Use './run.sh $SERVICE logs -f' to see logs"
+fi
+
+if [ "$COMMAND" = "down" ]; then
+  echo -e "${YELLOW}Services stopped${NC}"
+fi
