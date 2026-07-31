@@ -39,6 +39,7 @@ services:
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/moodledata
+      - ./nginx-uploads.conf:/etc/nginx/conf.d/uploads.conf:ro
     depends_on:
       - mariadb
     networks:
