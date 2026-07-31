@@ -36,8 +36,6 @@ services:
       - upload_max_filesize=500M
       - memory_limit=1G
       - max_input_vars=10000
-      - fastcgi_read_timeout=600s
-      - fastcgi_send_timeout=600s
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/moodledata
@@ -47,15 +45,11 @@ services:
       - moodle_internal
       - traefik_public
     labels:
-      - 'traefik.enable=true'
-      - 'traefik.http.routers.moodle.rule=Host(`${MOODLE_SITE_URL}`)'
-      - 'traefik.http.routers.moodle.entrypoints=websecure'
-      - 'traefik.http.routers.moodle.tls.certresolver=letsencrypt'
-      - 'traefik.http.services.moodle.loadbalancer.server.port=8080'
-      # PHP timeout settings for large uploads
-      - PHP_FPM_REQUEST_TERMINATE_TIMEOUT=600
-      - FPM_MAX_REQUESTS=1000
-      - FPM_PROCESS_IDLE_TIMEOUT=10
+      - "traefik.enable=true"
+      - "traefik.http.routers.moodle.rule=Host(`${MOODLE_SITE_URL}`)"
+      - "traefik.http.routers.moodle.entrypoints=websecure"
+      - "traefik.http.routers.moodle.tls.certresolver=letsencrypt"
+      - "traefik.http.services.moodle.loadbalancer.server.port=8080"
 
 networks:
   moodle_internal:
