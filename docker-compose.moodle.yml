@@ -52,6 +52,10 @@ services:
       - "traefik.http.routers.moodle.entrypoints=websecure"
       - "traefik.http.routers.moodle.tls.certresolver=letsencrypt"
       - "traefik.http.services.moodle.loadbalancer.server.port=8080"
+      - "traefik.http.middlewares.moodle-timeout.timeout.readtimeout=600s"
+      - "traefik.http.middlewares.moodle-timeout.timeout.writetimeout=600s"
+      - "traefik.http.middlewares.moodle-timeout.timeout.idletimeout=600s"
+      - "traefik.http.routers.moodle.middlewares=moodle-timeout"
 
 networks:
   moodle_internal:
