@@ -47,15 +47,15 @@ services:
       - moodle_internal
       - traefik_public
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.moodle.rule=Host(`${MOODLE_SITE_URL}`)"
-      - "traefik.http.routers.moodle.entrypoints=websecure"
-      - "traefik.http.routers.moodle.tls.certresolver=letsencrypt"
-      - "traefik.http.services.moodle.loadbalancer.server.port=8080"
-      - "traefik.http.middlewares.moodle-timeout.timeout.readtimeout=600s"
-      - "traefik.http.middlewares.moodle-timeout.timeout.writetimeout=600s"
-      - "traefik.http.middlewares.moodle-timeout.timeout.idletimeout=600s"
-      - "traefik.http.routers.moodle.middlewares=moodle-timeout"
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.moodle.rule=Host(`${MOODLE_SITE_URL}`)'
+      - 'traefik.http.routers.moodle.entrypoints=websecure'
+      - 'traefik.http.routers.moodle.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.moodle.loadbalancer.server.port=8080'
+      # PHP timeout settings for large uploads
+      - PHP_FPM_REQUEST_TERMINATE_TIMEOUT=600
+      - FPM_MAX_REQUESTS=1000
+      - FPM_PROCESS_IDLE_TIMEOUT=10
 
 networks:
   moodle_internal:
