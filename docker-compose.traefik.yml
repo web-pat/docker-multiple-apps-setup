@@ -23,3 +23,10 @@ services:
       - traefik_certificates:/traefik
     networks:
       - traefik_public
+
+networks:
+  traefik_public:
+    driver: bridge
+
+volumes:
+  traefik_certificates:

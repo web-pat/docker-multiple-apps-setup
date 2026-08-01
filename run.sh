@@ -21,28 +21,32 @@ shift 2
 # Map services to their compose files
 case "$SERVICE" in
   all)
-    echo -e "${GREEN}Managing all services (traefik, openedx, n8n, freshrss)${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.openedx.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
+    echo -e "${GREEN}Managing all services (traefik, adapt, n8n, freshrss)${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.adapt.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
     ;;
   traefik)
     echo -e "${GREEN}Managing Traefik only${NC}"
     COMPOSE_FILES="-f docker-compose.traefik.yml"
     ;;
+  adapt)
+    echo -e "${GREEN}Managing Adapt Learning (LMS + MongoDB)${NC}"
+    COMPOSE_FILES="-f docker-compose.adapt.yml"
+    ;;
   openedx)
     echo -e "${GREEN}Managing Open edX (LMS + CMS + databases)${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.openedx.yml"
+    COMPOSE_FILES="-f docker-compose.openedx.yml"
     ;;
   n8n)
     echo -e "${GREEN}Managing n8n${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.n8n.yml"
+    COMPOSE_FILES="-f docker-compose.n8n.yml"
     ;;
   freshrss)
     echo -e "${GREEN}Managing FreshRSS${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.freshrss.yml"
+    COMPOSE_FILES="-f docker-compose.freshrss.yml"
     ;;
   *)
     echo -e "${RED}Unknown service: $SERVICE${NC}"
-    echo "Available services: all, traefik, openedx, n8n, freshrss"
+    echo "Available services: all, traefik, adapt, openedx, n8n, freshrss"
     exit 1
     ;;
 esac
@@ -54,23 +58,26 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# Execute docker-compose command
-echo -e "${YELLOW}Running: docker-compose $COMPOSE_FILES $COMMAND $@${NC}"
-docker-compose $COMPOSE_FILES $COMMAND $@
+# Execute docker compose command
+echo -e "${YELLOW}Running: docker compose $COMPOSE_FILES $COMMAND $@${NC}"
+docker compose $COMPOSE_FILES $COMMAND $@
 
 # Provide helpful output for specific commands
 if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
   echo ""
   echo -e "${GREEN}✓ Services starting...${NC}"
+  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "adapt" ]]; then
+    echo "  Adapt Learning: https://learn.facultyai.eu (replace with your domain)"
+  fi
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "openedx" ]]; then
-    echo "  Open edX LMS:  https://lms.example.com (replace with your domain)"
-    echo "  Open edX CMS:  https://studio-lms.example.com"
+    echo "  Open edX LMS:   https://lms.example.com (replace with your domain)"
+    echo "  Open edX CMS:   https://studio-lms.example.com"
   fi
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "n8n" ]]; then
-    echo "  n8n:           https://n8n.example.com"
+    echo "  n8n:            https://n8n.example.com"
   fi
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "freshrss" ]]; then
-    echo "  FreshRSS:      https://feeds.example.com"
+    echo "  FreshRSS:       https://feeds.example.com"
   fi
   echo ""
   echo "Use './run.sh $SERVICE logs -f' to see logs"

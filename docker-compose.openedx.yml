@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Open edX / Tutor Integration with Traefik
 # This is a minimal configuration to run Open edX behind Traefik
 # Tutor normally manages its own compose file, but this simplified version
