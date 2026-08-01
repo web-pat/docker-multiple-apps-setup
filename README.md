@@ -1,13 +1,13 @@
 # Docker Server Configs
 
-Multi-app Docker Compose setup with Traefik reverse proxy, Moodle, n8n, and FreshRSS.
+Multi-app Docker Compose setup with Traefik reverse proxy, Adapt Learning, n8n, and FreshRSS.
 
 ## Architecture
 
 ```
 [Internet] → Host:80/443 → Traefik
-                            ├── moodle.example.com  → Moodle   → MariaDB
-                            ├── n8n.example.com     → n8n      → PostgreSQL
+                            ├── learn.example.com   → Adapt Learning → MongoDB
+                            ├── n8n.example.com     → n8n            → PostgreSQL
                             └── feeds.example.com   → FreshRSS (SQLite)
 ```
 
@@ -20,7 +20,7 @@ labels — no port conflicts, no manual reverse-proxy config per app.
 .env                                     ← All secrets & config (gitignored)
 docker-compose.yml                       ← Shared network & volume definitions
 docker-compose.traefik.yml               ← Traefik reverse proxy (entrypoint)
-docker-compose.moodle.yml                ← Moodle + MariaDB
+docker-compose.adapt.yml                 ← Adapt Learning + MongoDB
 docker-compose.n8n.yml                   ← n8n + PostgreSQL
 docker-compose.freshrss.yml              ← FreshRSS (SQLite)
 run.sh                                   ← Helper script (shortcut for compose)
@@ -33,21 +33,23 @@ All credentials live in `.env`, **not** in the compose files:
 
 ```env
 # Domains
-MOODLE_SITE_URL=moodle.example.com
+TRAEFIK_ACME_EMAIL=admin@example.com
+ADAPT_SITE_URL=learn.example.com
 N8N_DOMAIN=n8n.example.com
 FRESHRSS_DOMAIN=feeds.example.com
 
-# Moodle
-MOODLE_DB_ROOT_PASSWORD=...
-MOODLE_DB_PASSWORD=...
-MOODLE_ADMIN_PASSWORD=...
+# Adapt Learning
+ADAPT_ADMIN_EMAIL=admin@example.com
+ADAPT_ADMIN_PASSWORD=...
+ADAPT_MONGO_USER=...
+ADAPT_MONGO_PASSWORD=...
+ADAPT_SESSION_SECRET=...
 
 # n8n
+N8N_DB_USER=...
 N8N_DB_PASSWORD=...
+N8N_DB_NAME=...
 N8N_ENCRYPTION_KEY=...
-
-# FreshRSS
-FRESHRSS_ADMIN_PASSWORD=...
 ```
 
 Compose files reference these as `${VAR}` — Docker Compose reads `.env`
@@ -62,12 +64,12 @@ automatically when running from this directory.
 - Docker provider: discovers containers by labels, no config reload needed
 - Certificate storage: `traefik_certificates` Docker volume
 
-### Moodle (`docker-compose.moodle.yml`)
-- Image: `erseco/alpine-moodle:latest`
-- MariaDB 10.11 on internal `moodle_internal` network
-- Nginx & Certbot removed (Traefik handles SSL + reverse proxy)
-- `REVERSEPROXY=true`, `SSLPROXY=true`
-- Volumes: `mariadb_data`, `moodle_code`, `moodle_data`
+### Adapt Learning (`docker-compose.adapt.yml`)
+- Image: `garyritchie/docker-adaptauthoring:latest`
+- MongoDB 7 on internal `adapt_internal` network
+- Authoring tool + LMS frontend behind Traefik (port 5000)
+- `ENABLE_REVERSE_PROXY=true` for Traefik, admin credentials from `.env`
+- Volumes: `adapt_data`, `adapt_mongodb_data`
 
 ### n8n (`docker-compose.n8n.yml`)
 - Image: `n8nio/n8n:latest`
@@ -78,7 +80,7 @@ automatically when running from this directory.
 ### FreshRSS (`docker-compose.freshrss.yml`)
 - Image: `freshrss/freshrss:latest`
 - SQLite (no extra database container)
-- Cron job for feed refresh every 5 minutes
+- Cron job for feed refresh every 20 minutes
 - Volumes: `freshrss_data`, `freshrss_extensions`
 
 ## Usage
@@ -87,27 +89,30 @@ automatically when running from this directory.
 
 ```bash
 ./run.sh all up -d              # Start everything
-./run.sh moodle up -d           # Start only moodle (+ traefik)
-./run.sh n8n up -d              # Start only n8n (+ traefik)
-./run.sh freshrss up -d         # Start only freshrss (+ traefik)
+./run.sh adapt up -d            # Start only Adapt Learning
+./run.sh n8n up -d              # Start only n8n
+./run.sh freshrss up -d         # Start only freshrss
 ./run.sh traefik up -d          # Start traefik alone
 ```
+
+> App compose files treat `traefik_public` as an `external` network, so Traefik
+> must be running first. `./run.sh all up -d` handles this ordering automatically.
 
 ### View logs
 
 ```bash
 ./run.sh all logs -f            # Follow logs from all services
-./run.sh moodle logs -f         # Follow moodle + mariadb logs
+./run.sh adapt logs -f          # Follow adapt + mongodb logs
 ./run.sh n8n logs -f            # Follow n8n + postgres logs
 ```
 
 ### Stop / restart individual containers
 
 ```bash
-docker compose stop n8n_app          # Stop n8n only
-docker compose start n8n_app         # Start it again
-docker compose restart moodle_app    # Restart moodle
-docker compose stop freshrss         # Stop freshrss
+docker compose stop adapt_authoring     # Stop Adapt Learning only
+docker compose start adapt_authoring    # Start it again
+docker compose restart adapt_authoring  # Restart Adapt Learning
+docker compose stop freshrss            # Stop freshrss
 ```
 
 ### Stop everything
@@ -142,14 +147,14 @@ No ports to manage — only Traefik exposes 80/443 to the host.
 | Network | Scope | Purpose |
 |---------|-------|---------|
 | `traefik_public` | Shared (all apps) | HTTP traffic between Traefik and web services |
-| `moodle_internal` | Moodle only | MariaDB is not exposed to Traefik |
+| `adapt_internal` | Adapt only | MongoDB is not exposed to Traefik |
 | `n8n_internal` | n8n only | PostgreSQL is not exposed to Traefik |
 
 ## First-Run Notes
 
 - Traefik automatically provisions Let's Encrypt certificates. The first HTTPS request
   may be slow (certificate generation).
-- Moodle's initial setup is done via the `erseco/alpine-moodle` image env vars
-  (admin user, site name, etc.). No manual install wizard needed.
+- Adapt Learning creates its admin user from the `.env` credentials on first start
+  (`https://learn.example.com`).
 - n8n creates its admin user on first access (`https://n8n.example.com`).
 - FreshRSS shows its setup page on first access (`https://feeds.example.com`).
