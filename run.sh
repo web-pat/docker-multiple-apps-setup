@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Docker Compose Helper Script for Multi-App Setup with Traefik
-# Manages Traefik, Open edX, n8n, and FreshRSS
+# Manages Traefik, Adapt Learning, n8n, and FreshRSS
 
 set -e
 
@@ -69,7 +69,7 @@ if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "adapt" ]]; then
     echo "  Adapt Learning: https://learn.facultyai.eu (replace with your domain)"
   fi
-  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "openedx" ]]; then
+  if [[ "$SERVICE" == "openedx" ]]; then
     echo "  Open edX LMS:   https://lms.example.com (replace with your domain)"
     echo "  Open edX CMS:   https://studio-lms.example.com"
   fi
