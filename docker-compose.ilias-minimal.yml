@@ -1,0 +1,26 @@
+services:
+  ilias:
+    image: srsolutions/ilias:10-php8.3-apache
+    container_name: ilias_minimal_test
+    depends_on:
+      - mariadb
+    environment:
+      - ILIAS_AUTO_SETUP=1
+      - ILIAS_DB_HOST=mariadb
+      - ILIAS_DB_USER=root
+      - ILIAS_DB_PASSWORD=testpass123
+    ports:
+      - "8081:80"
+    networks:
+      - ilias_test
+
+  mariadb:
+    image: mariadb:10.11
+    environment:
+      - MYSQL_ROOT_PASSWORD=testpass123
+      - MYSQL_DATABASE=ilias
+    networks:
+      - ilias_test
+
+networks:
+  ilias_test:

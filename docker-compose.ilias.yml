@@ -1,0 +1,112 @@
+# docker-compose.ilias.yml
+# ILIAS LMS behind Traefik reverse proxy
+# Image: srsolutions/ilias (actively maintained, updated regularly)
+# Docs: https://hub.docker.com/r/srsolutions/ilias
+
+services:
+  ilias:
+    image: srsolutions/ilias:10-php8.3-apache
+    container_name: ilias_app
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+    environment:
+      # Automated setup - installs ILIAS on first start
+      - ILIAS_AUTO_SETUP=1
+      - ILIAS_AUTO_UPDATE=1
+
+      # Database connection
+      - ILIAS_DB_HOST=mariadb
+      - ILIAS_DB_USER=${ILIAS_DB_USER}
+      - ILIAS_DB_PASSWORD=${ILIAS_DB_PASSWORD}
+      - ILIAS_DB_NAME=${ILIAS_DB_NAME}
+
+      # Site configuration
+      - ILIAS_CLIENT_NAME=${ILIAS_CLIENT_NAME}
+      - ILIAS_HTTP_PATH=https://${ILIAS_SITE_URL}
+      - ILIAS_TIMEZONE=${ILIAS_TIMEZONE}
+
+      # Admin/root account
+      - ILIAS_ROOT_PASSWORD=${ILIAS_ROOT_PASSWORD}
+
+      # Upload & performance settings (this is what killed Moodle for you)
+      - ILIAS_MAX_UPLOAD_SIZE=${ILIAS_MAX_UPLOAD_SIZE}
+      - ILIAS_MEMORY_LIMIT=${ILIAS_MEMORY_LIMIT}
+      - ILIAS_SESSION_LIFETIME=${ILIAS_SESSION_LIFETIME}
+
+    volumes:
+      - ilias_data:/var/www/html/public/data
+      - ilias_iliasdata:/var/iliasdata/ilias
+    networks:
+      - ilias_internal
+      - traefik_public
+    labels:
+      # Enable Traefik
+      - 'traefik.enable=true'
+
+      # Router configuration
+      - 'traefik.http.routers.ilias.rule=Host(`${ILIAS_SITE_URL}`)'
+      - 'traefik.http.routers.ilias.entrypoints=websecure'
+      - 'traefik.http.routers.ilias.tls.certresolver=letsencrypt'
+
+      # Service configuration
+      - 'traefik.http.services.ilias.loadbalancer.server.port=80'
+      - 'traefik.http.services.ilias.loadbalancer.passhostheader=true'
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: ilias_db
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8
+      - --collation-server=utf8_general_ci
+      - --max-allowed-packet=512M
+    environment:
+      - MYSQL_ROOT_PASSWORD=${ILIAS_DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=${ILIAS_DB_NAME}
+      - MYSQL_USER=${ILIAS_DB_USER}
+      - MYSQL_PASSWORD=${ILIAS_DB_PASSWORD}
+    volumes:
+      - ilias_mariadb_data:/var/lib/mysql
+    networks:
+      - ilias_internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      timeout: 5s
+      retries: 10
+      interval: 10s
+
+  # ILIAS cron jobs (required for notifications, course progression triggers, etc.)
+  ilias-cron:
+    image: srsolutions/ilias:10-php8.3-apache
+    container_name: ilias_cron
+    restart: unless-stopped
+    depends_on:
+      - mariadb
+      - ilias
+    command: cron -f
+    environment:
+      - ILIAS_DB_HOST=mariadb
+      - ILIAS_DB_USER=${ILIAS_DB_USER}
+      - ILIAS_DB_PASSWORD=${ILIAS_DB_PASSWORD}
+      - ILIAS_DB_NAME=${ILIAS_DB_NAME}
+      - ILIAS_CLIENT_NAME=${ILIAS_CLIENT_NAME}
+      - ILIAS_HTTP_PATH=https://${ILIAS_SITE_URL}
+      - ILIAS_TIMEZONE=${ILIAS_TIMEZONE}
+    volumes:
+      - ilias_data:/var/www/html/public/data
+      - ilias_iliasdata:/var/iliasdata/ilias
+    networks:
+      - ilias_internal
+
+networks:
+  ilias_internal:
+    name: ilias_internal
+    driver: bridge
+  traefik_public:
+    external: true
+
+volumes:
+  ilias_data:
+  ilias_iliasdata:
+  ilias_mariadb_data:

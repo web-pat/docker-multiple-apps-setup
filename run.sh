@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Docker Compose Helper Script for Multi-App Setup with Traefik
-# Manages Traefik, Adapt Learning, n8n, and FreshRSS
+# Manages Traefik, Open edX, n8n, and FreshRSS
 
 set -e
 
@@ -21,12 +21,16 @@ shift 2
 # Map services to their compose files
 case "$SERVICE" in
   all)
-    echo -e "${GREEN}Managing all services (traefik, adapt, n8n, freshrss)${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.adapt.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
+    echo -e "${GREEN}Managing all services (traefik, ilias, n8n, freshrss)${NC}"
+    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.ilias.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
     ;;
   traefik)
     echo -e "${GREEN}Managing Traefik only${NC}"
     COMPOSE_FILES="-f docker-compose.traefik.yml"
+    ;;
+  ilias)
+    echo -e "${GREEN}Managing ILIAS (LMS + MariaDB + cron)${NC}"
+    COMPOSE_FILES="-f docker-compose.ilias.yml"
     ;;
   adapt)
     echo -e "${GREEN}Managing Adapt Learning (LMS + MongoDB)${NC}"
@@ -46,7 +50,7 @@ case "$SERVICE" in
     ;;
   *)
     echo -e "${RED}Unknown service: $SERVICE${NC}"
-    echo "Available services: all, traefik, adapt, openedx, n8n, freshrss"
+    echo "Available services: all, traefik, ilias, adapt, openedx, n8n, freshrss"
     exit 1
     ;;
 esac
@@ -66,10 +70,10 @@ docker compose $COMPOSE_FILES $COMMAND $@
 if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
   echo ""
   echo -e "${GREEN}✓ Services starting...${NC}"
-  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "adapt" ]]; then
-    echo "  Adapt Learning: https://learn.facultyai.eu (replace with your domain)"
+  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "ilias" ]]; then
+    echo "  ILIAS LMS:      https://learn.facultyai.eu (replace with your domain)"
   fi
-  if [[ "$SERVICE" == "openedx" ]]; then
+  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "openedx" ]]; then
     echo "  Open edX LMS:   https://lms.example.com (replace with your domain)"
     echo "  Open edX CMS:   https://studio-lms.example.com"
   fi
