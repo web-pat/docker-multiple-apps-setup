@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Docker Compose Helper Script for Multi-App Setup with Traefik
-# Manages Traefik, Open edX, n8n, and FreshRSS
+# Manages Traefik, ILIAS, n8n, and FreshRSS
 
 set -e
 
@@ -32,14 +32,6 @@ case "$SERVICE" in
     echo -e "${GREEN}Managing ILIAS (LMS + MariaDB + cron)${NC}"
     COMPOSE_FILES="-f docker-compose.ilias.yml"
     ;;
-  adapt)
-    echo -e "${GREEN}Managing Adapt Learning (LMS + MongoDB)${NC}"
-    COMPOSE_FILES="-f docker-compose.adapt.yml"
-    ;;
-  openedx)
-    echo -e "${GREEN}Managing Open edX (LMS + CMS + databases)${NC}"
-    COMPOSE_FILES="-f docker-compose.openedx.yml"
-    ;;
   n8n)
     echo -e "${GREEN}Managing n8n${NC}"
     COMPOSE_FILES="-f docker-compose.n8n.yml"
@@ -50,7 +42,7 @@ case "$SERVICE" in
     ;;
   *)
     echo -e "${RED}Unknown service: $SERVICE${NC}"
-    echo "Available services: all, traefik, ilias, adapt, openedx, n8n, freshrss"
+    echo "Available services: all, traefik, ilias, n8n, freshrss"
     exit 1
     ;;
 esac
@@ -74,10 +66,10 @@ if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
     echo "  ILIAS LMS:      https://lms.facultyai.eu"
   fi
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "n8n" ]]; then
-    echo "  n8n:            https://n8n.example.com"
+    echo "  n8n:            https://n8n.webpat.net"
   fi
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "freshrss" ]]; then
-    echo "  FreshRSS:       https://feeds.example.com"
+    echo "  FreshRSS:       https://feeds.patrickweber.info"
   fi
   echo ""
   echo "Use './run.sh $SERVICE logs -f' to see logs"
