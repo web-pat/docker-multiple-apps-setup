@@ -158,3 +158,8 @@ No ports to manage — only Traefik exposes 80/443 to the host.
   (`https://learn.example.com`).
 - n8n creates its admin user on first access (`https://n8n.example.com`).
 - FreshRSS shows its setup page on first access (`https://feeds.example.com`).
+
+## Upload filesize limit fix
+Although php and nginx within docker containers got more generous filesize and upload time limits uploads generally run into a hardcoded 60s limit by Traefik, which runs as a reverse proxy in front of all services listed above.
+
+Fixed by setting respondingTimeouts.readTimeout/writeTimeout/idleTimeout as static configuration (command-line flags on the Traefik entrypoint), not as per-router labels. That's the mechanism that actually works on Traefik v2.11 installation used in this setup. The label-based timeout middleware never parsed correctly, going all the way back to the Moodle attempts.

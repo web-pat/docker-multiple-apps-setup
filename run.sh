@@ -71,11 +71,7 @@ if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
   echo ""
   echo -e "${GREEN}✓ Services starting...${NC}"
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "ilias" ]]; then
-    echo "  ILIAS LMS:      https://learn.facultyai.eu (replace with your domain)"
-  fi
-  if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "openedx" ]]; then
-    echo "  Open edX LMS:   https://lms.example.com (replace with your domain)"
-    echo "  Open edX CMS:   https://studio-lms.example.com"
+    echo "  ILIAS LMS:      https://lms.facultyai.eu"
   fi
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "n8n" ]]; then
     echo "  n8n:            https://n8n.example.com"
