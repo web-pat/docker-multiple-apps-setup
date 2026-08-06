@@ -163,3 +163,22 @@ No ports to manage — only Traefik exposes 80/443 to the host.
 Although php and nginx within docker containers got more generous filesize and upload time limits uploads generally run into a hardcoded 60s limit by Traefik, which runs as a reverse proxy in front of all services listed above.
 
 Fixed by setting respondingTimeouts.readTimeout/writeTimeout/idleTimeout as static configuration (command-line flags on the Traefik entrypoint), not as per-router labels. That's the mechanism that actually works on Traefik v2.11 installation used in this setup. The label-based timeout middleware never parsed correctly, going all the way back to the Moodle attempts.
+
+## Ilias v10.9 2026-07-07 member tab Hotfix
+Opening the members tab in an existing course creates an error due to php failing to parse a category.
+
+Open the affected file within the Ilias Docker container in a text editor.
+
+`docker exec -it ilias_app nano /var/www/html/components/ILIAS/Course/classes/class.ilCourseParticipantsTableGUI.php`
+
+Search for a line looking like this
+
+`protected \$refinery;`
+
+and replace it like this
+
+`protected ILIAS\Refinery\Factory $refinery;`
+
+Reload the Ilias website for the cache to refresh.
+
+This fix will be lost after *docker compose down* and needs to be reapplied after it being rebuilt.
