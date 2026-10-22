@@ -3,7 +3,7 @@
 # Docker Compose Helper Script for Multi-App Setup with Traefik
 # Manages Traefik, ILIAS, n8n, and FreshRSS
 
-set -e
+set -euo pipefail
 
 # Color output
 RED='\033[0;31m'
@@ -11,39 +11,57 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Get service and command
-SERVICE=${1:-all}
-COMMAND=${2:-up -d}
+usage() {
+  printf 'Usage: %s <all|traefik|ilias|n8n|freshrss> <command> [args...]\n' "$0" >&2
+  printf 'Available services: all, traefik, ilias, n8n, freshrss\n' >&2
+}
 
-# Shift arguments
-shift 2
+if (($# == 0)); then
+  usage
+  exit 2
+fi
+
+SERVICE=$1
+shift
+
+# Preserve the default command when only a service is specified.
+if (($# == 0)); then
+  set -- up -d
+fi
+COMMAND=$1
 
 # Map services to their compose files
+COMPOSE_FILES=(-f docker-compose.yml)
 case "$SERVICE" in
   all)
     echo -e "${GREEN}Managing all services (traefik, ilias, n8n, freshrss)${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml -f docker-compose.ilias.yml -f docker-compose.n8n.yml -f docker-compose.freshrss.yml"
+    COMPOSE_FILES+=(
+      -f docker-compose.traefik.yml
+      -f docker-compose.ilias.yml
+      -f docker-compose.n8n.yml
+      -f docker-compose.freshrss.yml
+    )
     ;;
   traefik)
     echo -e "${GREEN}Managing Traefik only${NC}"
-    COMPOSE_FILES="-f docker-compose.traefik.yml"
+    COMPOSE_FILES+=(-f docker-compose.traefik.yml)
     ;;
   ilias)
     echo -e "${GREEN}Managing ILIAS (LMS + MariaDB + cron)${NC}"
-    COMPOSE_FILES="-f docker-compose.ilias.yml"
+    COMPOSE_FILES+=(-f docker-compose.ilias.yml)
     ;;
   n8n)
     echo -e "${GREEN}Managing n8n${NC}"
-    COMPOSE_FILES="-f docker-compose.n8n.yml"
+    COMPOSE_FILES+=(-f docker-compose.n8n.yml)
     ;;
   freshrss)
     echo -e "${GREEN}Managing FreshRSS${NC}"
-    COMPOSE_FILES="-f docker-compose.freshrss.yml"
+    COMPOSE_FILES+=(-f docker-compose.freshrss.yml)
     ;;
   *)
-    echo -e "${RED}Unknown service: $SERVICE${NC}"
-    echo "Available services: all, traefik, ilias, n8n, freshrss"
-    exit 1
+    printf '%b\n' "${RED}Unknown service: $SERVICE${NC}" >&2
+    usage
+    exit 2
     ;;
 esac
 
@@ -55,11 +73,13 @@ if [ ! -f .env ]; then
 fi
 
 # Execute docker compose command
-echo -e "${YELLOW}Running: docker compose $COMPOSE_FILES $COMMAND $@${NC}"
-docker compose $COMPOSE_FILES $COMMAND $@
+printf '%b' "${YELLOW}Running: docker compose"
+printf ' %q' "${COMPOSE_FILES[@]}" "$@"
+printf '%b\n' "$NC"
+docker compose "${COMPOSE_FILES[@]}" "$@"
 
 # Provide helpful output for specific commands
-if [ "$COMMAND" = "up" ] || [ "$COMMAND" = "up -d" ]; then
+if [ "$COMMAND" = "up" ]; then
   echo ""
   echo -e "${GREEN}✓ Services starting...${NC}"
   if [[ "$SERVICE" == "all" ]] || [[ "$SERVICE" == "ilias" ]]; then
