@@ -182,3 +182,5 @@ and replace it like this
 Reload the Ilias website for the cache to refresh.
 
 This fix will be lost after *docker compose down* and needs to be reapplied after it being rebuilt.
+
+**Update 2026-10-22:** Hotfix has been obsolete through updated docker image.
