@@ -1,0 +1,175 @@
+# Overlay: load AFTER all existing Compose files, using the same project name.
+# See README.md for setup, manual runs, and restore instructions.
+services:
+  mariadb:
+    volumes:
+      - backup_mariadb_dump:/backup-dump
+    labels:
+      docker-volume-backup.exec-label: multi-apps
+      docker-volume-backup.archive-pre: >-
+        /bin/sh -ec '
+        umask 077;
+        MYSQL_PWD="$$MYSQL_ROOT_PASSWORD"
+        mariadb-dump --user=root --single-transaction --quick
+        --routines --events --triggers
+        --databases "$$MYSQL_DATABASE"
+        > /backup-dump/ilias.sql.tmp;
+        test -s /backup-dump/ilias.sql.tmp;
+        mv /backup-dump/ilias.sql.tmp /backup-dump/ilias.sql;
+        printf "%s" "$$COMMAND_RUNTIME_ARCHIVE_FILEPATH" > /backup-dump/run-id
+        '
+
+  postgres_n8n:
+    volumes:
+      - backup_postgres_dump:/backup-dump
+    labels:
+      docker-volume-backup.exec-label: multi-apps
+      docker-volume-backup.archive-pre: >-
+        /bin/sh -ec '
+        umask 077;
+        PGPASSWORD="$$POSTGRES_PASSWORD"
+        pg_dump --host=127.0.0.1 --username="$$POSTGRES_USER"
+        --dbname="$$POSTGRES_DB" --format=custom
+        --file=/backup-dump/n8n.dump.tmp;
+        pg_restore --list /backup-dump/n8n.dump.tmp > /dev/null;
+        mv /backup-dump/n8n.dump.tmp /backup-dump/n8n.dump;
+        printf "%s" "$$COMMAND_RUNTIME_ARCHIVE_FILEPATH" > /backup-dump/run-id
+        '
+
+  # SQLite's online backup API is supplied separately; FreshRSS is unmodified.
+  backup-sqlite:
+    image: python:3.13.9-slim-bookworm
+    restart: unless-stopped
+    network_mode: none
+    entrypoint: [python, -c, "import time; time.sleep(float('inf'))"]
+    volumes:
+      - freshrss_data:/source:ro
+      - backup_sqlite_dump:/sqlite-dump
+    labels:
+      traefik.enable: "false"
+      docker-volume-backup.exec-label: multi-apps
+      docker-volume-backup.archive-pre: |
+        python -c '
+        import os
+        import shutil
+        import sqlite3
+        from pathlib import Path
+
+        os.umask(0o077)
+        source = Path("/source")
+        target = Path("/sqlite-dump")
+        databases = sorted(source.rglob("*.sqlite"))
+        if not databases:
+            raise RuntimeError("No FreshRSS *.sqlite databases found; check configuration")
+
+        for database in databases:
+            if database.is_symlink():
+                raise RuntimeError("Symlinked SQLite databases are not supported")
+            destination = target / database.relative_to(source)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            temporary = destination.with_name(destination.name + ".tmp")
+            temporary.unlink(missing_ok=True)
+
+            connection = sqlite3.connect(
+                database.as_uri() + "?mode=ro", uri=True, timeout=60
+            )
+            backup = sqlite3.connect(temporary)
+            try:
+                # Abort rather than wait indefinitely for an active writer.
+                import time
+                deadline = time.monotonic() + 300
+                def progress(status, remaining, total):
+                    if time.monotonic() > deadline:
+                        raise TimeoutError("SQLite backup exceeded five minutes")
+                connection.backup(backup, pages=256, progress=progress)
+                if backup.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+                    raise RuntimeError("SQLite integrity check failed")
+            finally:
+                backup.close()
+                connection.close()
+
+            shutil.copystat(database, temporary)
+            metadata = database.stat()
+            os.chown(temporary, metadata.st_uid, metadata.st_gid)
+            os.replace(temporary, destination)
+
+        expected = {target / database.relative_to(source) for database in databases}
+        for obsolete in target.rglob("*.sqlite"):
+            if obsolete not in expected:
+                obsolete.unlink()
+        (target / "run-id").write_text(os.environ["COMMAND_RUNTIME_ARCHIVE_FILEPATH"])
+        '
+
+  backup:
+    image: offen/docker-volume-backup:v2.49.3
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      postgres_n8n:
+        condition: service_healthy
+      backup-sqlite:
+        condition: service_started
+    environment:
+      TZ: Europe/Berlin
+      BACKUP_CRON_EXPRESSION: "0 3 * * *"
+      BACKUP_COMPRESSION: gz
+      GZIP_PARALLELISM: "1"
+      BACKUP_FILENAME: "multi-apps-%Y-%m-%dT%H-%M-%S.tar.gz"
+      EXEC_LABEL: multi-apps
+      EXEC_FORWARD_OUTPUT: "true"
+      # Neither label value must be assigned to an application container.
+      BACKUP_STOP_DURING_BACKUP_LABEL: online-backup-do-not-stop
+      BACKUP_STOP_DURING_BACKUP_NO_RESTART_LABEL: online-backup-do-not-stop
+      # Exclude live SQLite databases, their journals, and incomplete dumps.
+      BACKUP_EXCLUDE_REGEXP: '/backup/volumes/freshrss_data/.*\.sqlite(-wal|-shm|-journal)?$|/backup/databases/.*\.tmp$'
+      WEBDAV_URL: "${BACKUP_WEBDAV_URL:-https://webdav.example.invalid}"
+      WEBDAV_PATH: "${BACKUP_WEBDAV_PATH:-/backups/docker-multi-apps/}"
+      WEBDAV_USERNAME: "${BACKUP_WEBDAV_USERNAME:-REPLACE_ME}"
+      WEBDAV_PASSWORD: "${BACKUP_WEBDAV_PASSWORD:?Set BACKUP_WEBDAV_PASSWORD}"
+      WEBDAV_URL_INSECURE: "false"
+      GPG_PASSPHRASE: "${BACKUP_GPG_PASSPHRASE:?Set BACKUP_GPG_PASSPHRASE}"
+      # Enable retention only after a successful restore test.
+      BACKUP_RETENTION_DAYS: "-1"
+      BACKUP_PRUNING_PREFIX: "multi-apps-"
+      # Optional: e.g. a Shoutrrr URL; default notifications are failure-only.
+      NOTIFICATION_URLS: "${BACKUP_NOTIFICATION_URLS:-}"
+    volumes:
+      # :ro does NOT restrict Docker API operations; treat as host-admin access.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - backup_mariadb_dump:/backup/databases/mariadb:ro
+      - backup_postgres_dump:/backup/databases/postgres:ro
+      - backup_sqlite_dump:/backup/databases/freshrss:ro
+      - ilias_data:/backup/volumes/ilias_data:ro
+      - ilias_iliasdata:/backup/volumes/ilias_iliasdata:ro
+      - n8n_data:/backup/volumes/n8n_data:ro
+      - freshrss_data:/backup/volumes/freshrss_data:ro
+      - freshrss_extensions:/backup/volumes/freshrss_extensions:ro
+      - traefik_certificates:/backup/volumes/traefik_certificates:ro
+      - ./.env:/backup/config/.env:ro
+      - ./run.sh:/backup/config/run.sh:ro
+      - ./README.md:/backup/config/README.md:ro
+      - ./nginx-uploads.conf:/backup/config/nginx-uploads.conf:ro
+      - ./docker-compose.yml:/backup/config/docker-compose.yml:ro
+      - ./docker-compose.traefik.yml:/backup/config/docker-compose.traefik.yml:ro
+      - ./docker-compose.ilias.yml:/backup/config/docker-compose.ilias.yml:ro
+      - ./docker-compose.n8n.yml:/backup/config/docker-compose.n8n.yml:ro
+      - ./docker-compose.freshrss.yml:/backup/config/docker-compose.freshrss.yml:ro
+      - ./docker-compose.backup.yml:/backup/config/docker-compose.backup.yml:ro
+    labels:
+      traefik.enable: "false"
+      docker-volume-backup.exec-label: multi-apps
+      # Hooks on stopped containers are skipped by the upstream tool. Refuse
+      # upload if ANY dump was not produced for this particular archive.
+      # archive-post runs before encryption and the WebDAV copy phase.
+      docker-volume-backup.archive-post: >-
+        /bin/sh -ec '
+        for database in mariadb postgres freshrss; do
+          test "$$(cat /backup/databases/$$database/run-id)" = "$$COMMAND_RUNTIME_ARCHIVE_FILEPATH";
+        done
+        '
+
+volumes:
+  backup_mariadb_dump:
+  backup_postgres_dump:
+  backup_sqlite_dump:
